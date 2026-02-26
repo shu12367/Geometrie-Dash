@@ -1,0 +1,115 @@
+using UnityEngine;
+using UnityEngine.SceneManagement;
+using UnityEngine.UI;
+
+// ========== PLAYER STEUERUNG ==========
+public class PlayerController : MonoBehaviour
+{
+    public float moveSpeed = 5f;
+    public float jumpForce = 10f;
+    public LayerMask groundLayer;
+
+    private Rigidbody2D rb;
+    private bool isGrounded;
+    private Vector3 startScale;
+
+    void Start()
+    {
+        rb = GetComponent<Rigidbody2D>();
+        startScale = transform.localScale;
+    }
+
+    void Update()
+    {
+        transform.Translate(Vector2.right * moveSpeed * Time.deltaTime);
+
+        isGrounded = Physics2D.Raycast(transform.position, Vector2.down, 1.1f, groundLayer);
+
+        // Sprung bei Touch oder Mausklick (für Editor-Tests)
+        if (Input.touchCount > 0 && Input.GetTouch(0).phase == TouchPhase.Began && isGrounded)
+        {
+            Jump();
+        }
+        else if (Input.GetMouseButtonDown(0) && isGrounded)
+        {
+            Jump();
+        }
+
+        Animate();
+    }
+
+    void Jump()
+    {
+        rb.velocity = new Vector2(rb.velocity.x, jumpForce);
+    }
+
+    void Animate()
+    {
+        if (!isGrounded)
+            transform.localScale = new Vector3(startScale.x, startScale.y * 1.2f, startScale.z);
+        else
+            transform.localScale = startScale;
+    }
+
+    void OnCollisionEnter2D(Collision2D collision)
+    {
+        if (collision.gameObject.CompareTag("Obstacle"))
+        {
+            SceneManager.LoadScene(SceneManager.GetActiveScene().name);
+        }
+    }
+}
+
+// ========== KAMERA FOLGEN ==========
+public class CameraFollow : MonoBehaviour
+{
+    public Transform player;
+    public float offsetX = 2f;
+
+    void LateUpdate()
+    {
+        if (player != null)
+        {
+            Vector3 pos = transform.position;
+            pos.x = player.position.x + offsetX;
+            transform.position = pos;
+        }
+    }
+}
+
+// ========== FORTSCHRITTSBALKEN ==========
+public class ProgressBar : MonoBehaviour
+{
+    public Transform player;
+    public Transform goal;
+    public Slider slider;
+
+    private float startX;
+    private float endX;
+
+    void Start()
+    {
+        startX = player.position.x;
+        endX = goal.position.x;
+    }
+
+    void Update()
+    {
+        float t = Mathf.InverseLerp(startX, endX, player.position.x);
+        slider.value = Mathf.Clamp01(t);
+    }
+}
+
+// ========== ZIEL-PORTAL ==========
+public class Goal : MonoBehaviour
+{
+    public string nextSceneName = "Welt2";
+
+    void OnTriggerEnter2D(Collider2D other)
+    {
+        if (other.CompareTag("Player"))
+        {
+            SceneManager.LoadScene(nextSceneName);
+        }
+    }
+}
