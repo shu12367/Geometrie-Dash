@@ -1,3 +1,16 @@
+// ============================================
+// KOMPLETTE SKRIPTE FÜR DEIN GEOMETRY DASH SPIEL
+// ============================================
+// HINWEIS: Diese Datei enthält ALLE Klassen hintereinander.
+// Um sie in Unity zu verwenden, musst du JEDE KLASSE in eine
+// eigene Datei auslagern mit dem jeweiligen Klassennamen als Dateinamen.
+// Also:
+// - PlayerController.cs
+// - CameraFollow.cs
+// - ProgressBar.cs
+// - Goal.cs
+// ============================================
+
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
@@ -25,7 +38,6 @@ public class PlayerController : MonoBehaviour
 
         isGrounded = Physics2D.Raycast(transform.position, Vector2.down, 1.1f, groundLayer);
 
-        // Sprung bei Touch oder Mausklick (für Editor-Tests)
         if (Input.touchCount > 0 && Input.GetTouch(0).phase == TouchPhase.Began && isGrounded)
         {
             Jump();
