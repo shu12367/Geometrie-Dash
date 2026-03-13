@@ -1,127 +1,466 @@
-// ============================================
-// KOMPLETTE SKRIPTE FÜR DEIN GEOMETRY DASH SPIEL
-// ============================================
-// HINWEIS: Diese Datei enthält ALLE Klassen hintereinander.
-// Um sie in Unity zu verwenden, musst du JEDE KLASSE in eine
-// eigene Datei auslagern mit dem jeweiligen Klassennamen als Dateinamen.
-// Also:
-// - PlayerController.cs
-// - CameraFollow.cs
-// - ProgressBar.cs
-// - Goal.cs
-// ============================================
-
-using UnityEngine;
-using UnityEngine.SceneManagement;
-using UnityEngine.UI;
-
-// ========== PLAYER STEUERUNG ==========
-public class PlayerController : MonoBehaviour
-{
-    public float moveSpeed = 5f;
-    public float jumpForce = 10f;
-    public LayerMask groundLayer;
-
-    private Rigidbody2D rb;
-    private bool isGrounded;
-    private Vector3 startScale;
-
-    void Start()
-    {
-        rb = GetComponent<Rigidbody2D>();
-        startScale = transform.localScale;
-    }
-
-    void Update()
-    {
-        transform.Translate(Vector2.right * moveSpeed * Time.deltaTime);
-
-        isGrounded = Physics2D.Raycast(transform.position, Vector2.down, 1.1f, groundLayer);
-
-        if (Input.touchCount > 0 && Input.GetTouch(0).phase == TouchPhase.Began && isGrounded)
-        {
-            Jump();
-        }
-        else if (Input.GetMouseButtonDown(0) && isGrounded)
-        {
-            Jump();
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Panda Ege - Jäger der Wildnis</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
         }
 
-        Animate();
-    }
-
-    void Jump()
-    {
-        rb.velocity = new Vector2(rb.velocity.x, jumpForce);
-    }
-
-    void Animate()
-    {
-        if (!isGrounded)
-            transform.localScale = new Vector3(startScale.x, startScale.y * 1.2f, startScale.z);
-        else
-            transform.localScale = startScale;
-    }
-
-    void OnCollisionEnter2D(Collision2D collision)
-    {
-        if (collision.gameObject.CompareTag("Obstacle"))
-        {
-            SceneManager.LoadScene(SceneManager.GetActiveScene().name);
+        body {
+            font-family: 'Arial', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
         }
-    }
-}
 
-// ========== KAMERA FOLGEN ==========
-public class CameraFollow : MonoBehaviour
-{
-    public Transform player;
-    public float offsetX = 2f;
-
-    void LateUpdate()
-    {
-        if (player != null)
-        {
-            Vector3 pos = transform.position;
-            pos.x = player.position.x + offsetX;
-            transform.position = pos;
+        .game-container {
+            background: white;
+            border-radius: 20px;
+            padding: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            text-align: center;
         }
-    }
-}
 
-// ========== FORTSCHRITTSBALKEN ==========
-public class ProgressBar : MonoBehaviour
-{
-    public Transform player;
-    public Transform goal;
-    public Slider slider;
-
-    private float startX;
-    private float endX;
-
-    void Start()
-    {
-        startX = player.position.x;
-        endX = goal.position.x;
-    }
-
-    void Update()
-    {
-        float t = Mathf.InverseLerp(startX, endX, player.position.x);
-        slider.value = Mathf.Clamp01(t);
-    }
-}
-
-// ========== ZIEL-PORTAL ==========
-public class Goal : MonoBehaviour
-{
-    public string nextSceneName = "Welt2";
-
-    void OnTriggerEnter2D(Collider2D other)
-    {
-        if (other.CompareTag("Player"))
-        {
-            SceneManager.LoadScene(nextSceneName);
+        h1 {
+            color: #333;
+            margin-bottom: 20px;
+            font-size: 28px;
         }
-    }
-}
+
+        .stats {
+            display: flex;
+            justify-content: space-around;
+            margin-bottom: 20px;
+            padding: 10px;
+            background: #f0f0f0;
+            border-radius: 10px;
+            font-weight: bold;
+        }
+
+        .stats div {
+            color: #333;
+        }
+
+        #gameCanvas {
+            border: 3px solid #333;
+            border-radius: 10px;
+            background: #87CEEB;
+            display: block;
+            margin: 0 auto;
+        }
+
+        .controls {
+            margin-top: 15px;
+            color: #666;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <div class="game-container">
+        <h1>🐼 Panda Ege - Jäger der Wildnis</h1>
+        
+        <div class="stats">
+            <div>Level: <span id="level">1</span></div>
+            <div>Größe: <span id="size">100%</span></div>
+            <div>Stärke: <span id="strength">10</span></div>
+            <div>Punkte: <span id="score">0</span></div>
+        </div>
+
+        <canvas id="gameCanvas" width="800" height="500"></canvas>
+        
+        <div class="controls">
+            <p>⬆️⬇️⬅️➡️ Bewegen | ␣ Leertaste = Angreifen</p>
+        </div>
+    </div>
+
+    <script>
+        // Canvas Setup
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        // Spieler Stats
+        let player = {
+            x: 400,
+            y: 250,
+            size: 20,
+            speed: 5,
+            level: 1,
+            strength: 10,
+            score: 0,
+            health: 100,
+            maxHealth: 100,
+            exp: 0,
+            expToNextLevel: 50
+        };
+
+        // Arrays für Beute und Feinde
+        let prey = [];
+        let enemies = [];
+
+        // Tastensteuerung
+        let keys = {
+            ArrowUp: false,
+            ArrowDown: false,
+            ArrowLeft: false,
+            ArrowRight: false,
+            space: false
+        };
+
+        // Spiel Loop
+        let gameRunning = true;
+        let attackCooldown = 0;
+        let frameCount = 0;
+
+        // Event Listener für Tasten
+        document.addEventListener('keydown', (e) => {
+            if (e.key in keys) {
+                keys[e.key] = true;
+                e.preventDefault();
+            }
+            if (e.key === ' ') {
+                keys.space = true;
+                e.preventDefault();
+            }
+        });
+
+        document.addEventListener('keyup', (e) => {
+            if (e.key in keys) {
+                keys[e.key] = false;
+            }
+            if (e.key === ' ') {
+                keys.space = false;
+            }
+        });
+
+        // Gegner und Beute erstellen
+        function spawnCreatures() {
+            // Beute spawnen (kleine Tiere)
+            if (prey.length < 6 && Math.random() < 0.02) {
+                let size = 8 + Math.random() * 10;
+                prey.push({
+                    x: Math.random() * (canvas.width - 40) + 20,
+                    y: Math.random() * (canvas.height - 40) + 20,
+                    size: size,
+                    speed: 0.5 + Math.random() * 1.5,
+                    health: Math.floor(size / 2),
+                    type: 'prey',
+                    color: '#FFD700'
+                });
+            }
+            
+            // Feinde spawnen (starke Tiere)
+            if (enemies.length < 4 && Math.random() < 0.01) {
+                let size = 15 + Math.random() * 15;
+                enemies.push({
+                    x: Math.random() * (canvas.width - 50) + 25,
+                    y: Math.random() * (canvas.height - 50) + 25,
+                    size: size,
+                    speed: 0.3 + Math.random(),
+                    health: Math.floor(size * 1.5),
+                    damage: Math.floor(size / 2),
+                    type: 'enemy',
+                    color: '#FF4444'
+                });
+            }
+        }
+
+        // Bewegung der Kreaturen
+        function moveCreatures() {
+            // Beute bewegt sich zufällig
+            prey.forEach(animal => {
+                animal.x += (Math.random() - 0.5) * animal.speed * 2;
+                animal.y += (Math.random() - 0.5) * animal.speed * 2;
+                
+                // Im Canvas bleiben
+                animal.x = Math.max(animal.size, Math.min(canvas.width - animal.size, animal.x));
+                animal.y = Math.max(animal.size, Math.min(canvas.height - animal.size, animal.y));
+            });
+
+            // Feinde bewegen sich Richtung Spieler
+            enemies.forEach(enemy => {
+                let dx = player.x - enemy.x;
+                let dy = player.y - enemy.y;
+                let distance = Math.sqrt(dx * dx + dy * dy);
+                
+                if (distance > 0) {
+                    enemy.x += (dx / distance) * enemy.speed;
+                    enemy.y += (dy / distance) * enemy.speed;
+                }
+                
+                // Im Canvas bleiben
+                enemy.x = Math.max(enemy.size, Math.min(canvas.width - enemy.size, enemy.x));
+                enemy.y = Math.max(enemy.size, Math.min(canvas.height - enemy.size, enemy.y));
+            });
+        }
+
+        // Spieler bewegen
+        function movePlayer() {
+            let moveX = 0;
+            let moveY = 0;
+            
+            if (keys.ArrowUp) moveY -= player.speed;
+            if (keys.ArrowDown) moveY += player.speed;
+            if (keys.ArrowLeft) moveX -= player.speed;
+            if (keys.ArrowRight) moveX += player.speed;
+            
+            // Normale Bewegung (diagonal nicht schneller)
+            if (moveX !== 0 && moveY !== 0) {
+                moveX *= 0.7;
+                moveY *= 0.7;
+            }
+            
+            player.x = Math.max(player.size, Math.min(canvas.width - player.size, player.x + moveX));
+            player.y = Math.max(player.size, Math.min(canvas.height - player.size, player.y + moveY));
+        }
+
+        // Kämpfe
+        function handleCombat() {
+            // Angriff (Leertaste)
+            if (keys.space && attackCooldown <= 0) {
+                attackCooldown = 10;
+                
+                // Beute angreifen
+                for (let i = prey.length - 1; i >= 0; i--) {
+                    let animal = prey[i];
+                    let dx = player.x - animal.x;
+                    let dy = player.y - animal.y;
+                    let distance = Math.sqrt(dx * dx + dy * dy);
+                    
+                    if (distance < player.size + animal.size + 20) {
+                        animal.health -= player.strength;
+                        
+                        if (animal.health <= 0) {
+                            // Beute gefressen
+                            prey.splice(i, 1);
+                            player.score += 10;
+                            player.size += 0.5;
+                            player.exp += 10;
+                            
+                            // Level up
+                            if (player.exp >= player.expToNextLevel) {
+                                player.level++;
+                                player.strength += 5;
+                                player.exp = 0;
+                                player.expToNextLevel *= 1.5;
+                                player.maxHealth += 20;
+                                player.health = player.maxHealth;
+                            }
+                        }
+                        break;
+                    }
+                }
+                
+                // Feinde angreifen
+                for (let i = enemies.length - 1; i >= 0; i--) {
+                    let enemy = enemies[i];
+                    let dx = player.x - enemy.x;
+                    let dy = player.y - enemy.y;
+                    let distance = Math.sqrt(dx * dx + dy * dy);
+                    
+                    if (distance < player.size + enemy.size + 20) {
+                        enemy.health -= player.strength;
+                        
+                        if (enemy.health <= 0) {
+                            // Feind besiegt
+                            enemies.splice(i, 1);
+                            player.score += 30;
+                            player.size += 1;
+                            player.exp += 25;
+                            
+                            // Level up
+                            if (player.exp >= player.expToNextLevel) {
+                                player.level++;
+                                player.strength += 5;
+                                player.exp = 0;
+                                player.expToNextLevel *= 1.5;
+                                player.maxHealth += 20;
+                                player.health = player.maxHealth;
+                            }
+                        }
+                        break;
+                    }
+                }
+            }
+            
+            // Feinde greifen Spieler an
+            enemies.forEach(enemy => {
+                let dx = player.x - enemy.x;
+                let dy = player.y - enemy.y;
+                let distance = Math.sqrt(dx * dx + dy * dy);
+                
+                if (distance < player.size + enemy.size) {
+                    if (Math.random() < 0.02) {
+                        player.health -= enemy.damage;
+                        
+                        if (player.health <= 0) {
+                            gameRunning = false;
+                            alert('Game Over! Du hast ' + player.score + ' Punkte erreicht!');
+                            resetGame();
+                        }
+                    }
+                }
+            });
+            
+            if (attackCooldown > 0) attackCooldown--;
+        }
+
+        // Spiel zurücksetzen
+        function resetGame() {
+            player = {
+                x: 400,
+                y: 250,
+                size: 20,
+                speed: 5,
+                level: 1,
+                strength: 10,
+                score: 0,
+                health: 100,
+                maxHealth: 100,
+                exp: 0,
+                expToNextLevel: 50
+            };
+            prey = [];
+            enemies = [];
+            gameRunning = true;
+        }
+
+        // Alles zeichnen
+        function draw() {
+            // Hintergrund
+            ctx.fillStyle = '#87CEEB';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // Bodenmuster
+            ctx.fillStyle = '#90EE90';
+            for (let i = 0; i < canvas.width; i += 40) {
+                for (let j = 0; j < canvas.height; j += 40) {
+                    ctx.fillRect(i, j, 20, 20);
+                }
+            }
+            
+            // Beute zeichnen (kleine Tiere)
+            prey.forEach(animal => {
+                ctx.beginPath();
+                ctx.arc(animal.x, animal.y, animal.size, 0, Math.PI * 2);
+                ctx.fillStyle = animal.color;
+                ctx.fill();
+                ctx.strokeStyle = '#000';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+                
+                // Gesundheitsbalken
+                ctx.fillStyle = '#00FF00';
+                ctx.fillRect(animal.x - animal.size, animal.y - animal.size - 10, 
+                           (animal.health / (animal.size / 2)) * animal.size * 2, 5);
+                
+                // Augen
+                ctx.fillStyle = '#000';
+                ctx.beginPath();
+                ctx.arc(animal.x - animal.size/3, animal.y - animal.size/3, animal.size/5, 0, Math.PI * 2);
+                ctx.arc(animal.x + animal.size/3, animal.y - animal.size/3, animal.size/5, 0, Math.PI * 2);
+                ctx.fill();
+            });
+            
+            // Feinde zeichnen
+            enemies.forEach(enemy => {
+                ctx.beginPath();
+                ctx.arc(enemy.x, enemy.y, enemy.size, 0, Math.PI * 2);
+                ctx.fillStyle = enemy.color;
+                ctx.fill();
+                ctx.strokeStyle = '#000';
+                ctx.lineWidth = 3;
+                ctx.stroke();
+                
+                // Gesundheitsbalken
+                ctx.fillStyle = '#FF0000';
+                ctx.fillRect(enemy.x - enemy.size, enemy.y - enemy.size - 10, 
+                           (enemy.health / (enemy.size * 1.5)) * enemy.size * 2, 5);
+                
+                // Böse Augen
+                ctx.fillStyle = '#000';
+                ctx.beginPath();
+                ctx.arc(enemy.x - enemy.size/3, enemy.y - enemy.size/3, enemy.size/4, 0, Math.PI * 2);
+                ctx.arc(enemy.x + enemy.size/3, enemy.y - enemy.size/3, enemy.size/4, 0, Math.PI * 2);
+                ctx.fill();
+                
+                // Augenbrauen (böse)
+                ctx.beginPath();
+                ctx.strokeStyle = '#000';
+                ctx.lineWidth = 3;
+                ctx.moveTo(enemy.x - enemy.size, enemy.y - enemy.size);
+                ctx.lineTo(enemy.x - enemy.size/2, enemy.y - enemy.size/1.5);
+                ctx.moveTo(enemy.x + enemy.size, enemy.y - enemy.size);
+                ctx.lineTo(enemy.x + enemy.size/2, enemy.y - enemy.size/1.5);
+                ctx.stroke();
+            });
+            
+            // Spieler (Panda Ege) zeichnen
+            ctx.beginPath();
+            ctx.arc(player.x, player.y, player.size, 0, Math.PI * 2);
+            ctx.fillStyle = '#000';
+            ctx.fill();
+            
+            // Weißes Gesicht
+            ctx.beginPath();
+            ctx.arc(player.x, player.y, player.size * 0.8, 0, Math.PI * 2);
+            ctx.fillStyle = '#FFF';
+            ctx.fill();
+            
+            // Schwarze Augen
+            ctx.fillStyle = '#000';
+            ctx.beginPath();
+            ctx.arc(player.x - player.size/3, player.y - player.size/4, player.size/4, 0, Math.PI * 2);
+            ctx.arc(player.x + player.size/3, player.y - player.size/4, player.size/4, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // Weiße Pupillen
+            ctx.fillStyle = '#FFF';
+            ctx.beginPath();
+            ctx.arc(player.x - player.size/2.5, player.y - player.size/2.5, player.size/10, 0, Math.PI * 2);
+            ctx.arc(player.x + player.size/5, player.y - player.size/2.5, player.size/10, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // Nase
+            ctx.fillStyle = '#000';
+            ctx.beginPath();
+            ctx.arc(player.x, player.y + player.size/6, player.size/6, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // Gesundheitsbalken Spieler
+            ctx.fillStyle = '#00FF00';
+            ctx.fillRect(10, 10, (player.health / player.maxHealth) * 200, 20);
+            ctx.strokeStyle = '#000';
+            ctx.strokeRect(10, 10, 200, 20);
+            
+            // Stats aktualisieren
+            document.getElementById('level').textContent = player.level;
+            document.getElementById('size').textContent = Math.round((player.size / 20) * 100) + '%';
+            document.getElementById('strength').textContent = player.strength;
+            document.getElementById('score').textContent = player.score;
+        }
+
+        // Hauptspiel-Schleife
+        function gameLoop() {
+            if (gameRunning) {
+                movePlayer();
+                spawnCreatures();
+                moveCreatures();
+                handleCombat();
+                draw();
+            }
+            requestAnimationFrame(gameLoop);
+        }
+
+        // Spiel starten
+        gameLoop();
+    </script>
+</body>
+</html>
